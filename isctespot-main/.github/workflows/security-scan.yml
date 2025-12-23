@@ -1,0 +1,23 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run Semgrep (SAST)
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: "p/owasp-top-ten"
+
+      - name: Run Gitleaks (Secret Scanning)
+        uses: gitleaks/gitleaks-action@v2
