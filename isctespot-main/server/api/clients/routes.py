@@ -51,7 +51,7 @@ def delete_client():
     dict_data = request.get_json()
     token = dict_data['token']
     is_valid, payload = validate_token(token)
-    if not is_valid:
+    if not is_valid or not payload.get('is_admin'):
         return jsonify({'status': 'Unauthorised'}), 403
     result = dbc.execute_query(query='delete_client_by_id', args=dict_data['client_id'])
     if isinstance(result, int):
