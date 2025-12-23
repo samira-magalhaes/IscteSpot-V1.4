@@ -1,4 +1,5 @@
-<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+
+<!-- Improved compatibility of back to top link -->
 <a id="readme-top"></a>
 <br />
 <div align="center">
@@ -7,146 +8,148 @@
   <h3 align="center">IscteSpot</h3>
 
   <p align="center">
-    A Damn vulnerable SaaS application for ISCTE - Software and Application Security
+    Uma aplicação SaaS deliberadamente vulnerável para ISCTE – Segurança de Software e Aplicações
     <br />
     <br />
   </p>
 </div>
 
+## Sobre o Projeto
 
+Este projeto é direcionado aos estudantes do ISCTE inscritos na unidade curricular de **Segurança de Software e Aplicações**.  
+Os estudantes irão utilizar este projeto para compreender as implicações da segurança em aplicações web modernas e entender os riscos ao nível do negócio.
 
-<!-- ABOUT THE PROJECT -->
-## About The Project
+## Começar
 
-This project is targeted to the students of ISCTE that are enlisted in Software and Application Security course subject.
-The students will use this project to understand the implications of security in modern web applications and understand the risks on the business level.
+Existem 2 opções para executar a aplicação: utilizando **Docker** ou instalando e executando localmente.  
+Abaixo encontram-se duas secções com os passos de instalação para ambos os casos.
 
-## Getting Started
+Primeiro, pode clonar este repositório para a localização desejada:
+```sh
+git clone https://github.com/narfasec/isctespot.git
+```
 
-There are 2 options to run the application, you can use Docker or you can install and run it locally. Below there will be 2 sections with installation steps for both cases.
-First you can git clone this project to your desired location:
-   ```sh
-   git clone https://github.com/narfasec/isctespot.git
-   ```
-## Docker (Quick start)
+## Docker (Início Rápido)
 
-[Install Docker](https://docs.docker.com/engine/install/), if not installed in your system.
-* After installing docker, make sure docker deamon is running (opening the desktop app of Docker is enough)
-* Change directory to iscte_spot and execute docker compose to build and start the project
-  ```
-  cd iscte_spot/
-  docker-compose up --build
-  ```
-* Execute the setup script (**setup.ps1** for windows, **setup.sh** for Mac and Linux) to populate the database with testing data.
-  ```
-  .\setup.ps1
-  ```
-* At this stage your app should be ready. You can run health checks to check if everything is in order. You can go to you browser and paste **http://localhost:5173** and see the application interface.
-  ```
-  docker exec project-server-1 python /app/tests/health_checks/test_flow_1.py
-  ```
+[Instalar Docker](https://docs.docker.com/engine/install/), caso ainda não esteja instalado no seu sistema.
 
-## Local Setup (Manual Installation)
+* Após instalar o Docker, certifique-se de que o daemon do Docker está a correr (abrir a aplicação Docker Desktop é suficiente)
+* Mude para o diretório iscte_spot e execute o docker compose para construir e iniciar o projeto
+```
+cd iscte_spot/
+docker-compose up --build
+```
+* Execute o script de configuração (**setup.ps1** para Windows, **setup.sh** para macOS e Linux) para popular a base de dados com dados de teste.
+```
+.\setup.ps1
+```
+* Nesta fase a aplicação deverá estar pronta. Pode executar verificações de estado para confirmar se está tudo correto.  
+  Abra o navegador e aceda a **http://localhost:5173** para ver a interface da aplicação.
+```
+docker exec project-server-1 python /app/tests/health_checks/test_flow_1.py
+```
 
-_Below are the steps to setup the project on your local environment. This is also the developer setup, with this setup you can easily make changes and debug issues._
+## Configuração Local (Instalação Manual)
 
-### Prerequisites
-* **Python 3.9+** - [Download from python.org](https://www.python.org/downloads/)
-* **Node.js 18+** - [Download from nodejs.org](https://nodejs.org/)
-* **MariaDB** - [Download from mariadb.com](https://mariadb.com/downloads/)
-* **npm** - Usually comes with Node.js
+_Abaixo encontram-se os passos para configurar o projeto no seu ambiente local. Esta também é a configuração recomendada para desenvolvimento, permitindo alterar código e depurar problemas facilmente._
 
-### Installation Steps
+### Pré-requisitos
+* **Python 3.9+** – [Transferir de python.org](https://www.python.org/downloads/)
+* **Node.js 18+** – [Transferir de nodejs.org](https://nodejs.org/)
+* **MariaDB** – [Transferir de mariadb.com](https://mariadb.com/downloads/)
+* **npm** – Normalmente incluído com o Node.js
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/narfasec/isctespot.git
-   cd isctespot/
-   ```
+### Passos de Instalação
 
-2. **Set up MariaDB**
-   - Install MariaDB on your system
+1. **Clonar o repositório**
+```bash
+git clone https://github.com/narfasec/isctespot.git
+cd isctespot/
+```
 
-3. **Set up Python environment**
-   ```bash
-   cd server/
-   python -m venv venv
-   
-   # Windows
-   venv\Scripts\activate
-   # Linux/macOS
-   source venv/bin/activate
-   
-   pip install -r requirements.txt
-   ```
+2. **Configurar MariaDB**
+- Instale o MariaDB no seu sistema
 
-4. **Set up Frontend**
-   ```bash
-   cd frontend/admin-one-vue-tailwind-master/
-   npm install
-   ```
-### Quick Start for local setup
+3. **Configurar o ambiente Python**
+```bash
+cd server/
+python -m venv venv
 
-The easiest way to get started with automated health check and setup script:
+# Windows
+venv\Scripts\activate
+# Linux/macOS
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+4. **Configurar o Frontend**
+```bash
+cd frontend/admin-one-vue-tailwind-master/
+npm install
+```
+
+### Início Rápido para Configuração Local
+
+A forma mais simples de começar, com verificação automática e script de configuração:
 
 ```bash
 cd isctespot/
 python isctespot_setup.py
 ```
 
-This script will:
-- ✅ Check system requirements (Python 3.9, Node.js 18+, npm, MariaDB)
-- ✅ Verify virtual environment and dependencies
-- ✅ Test MariaDB connection on localhost:3306
-- ✅ Offer to install missing packages
-- ✅ Provide database setup options ("Run all setup scripts" to set up database for the first time)
-- ✅ Start all services in development mode
-- ✅ Run health checks on all services
-- ✅ Optionally run e2e tests
+Este script irá:
+- ✅ Verificar os requisitos do sistema (Python 3.9, Node.js 18+, npm, MariaDB)
+- ✅ Validar o ambiente virtual e dependências
+- ✅ Testar a ligação ao MariaDB em localhost:3306
+- ✅ Oferecer a instalação de pacotes em falta
+- ✅ Disponibilizar opções de configuração da base de dados ("Executar todos os scripts de setup" para primeira execução)
+- ✅ Iniciar todos os serviços em modo de desenvolvimento
+- ✅ Executar verificações de estado em todos os serviços
+- ✅ Opcionalmente executar testes end-to-end (e2e)
 
-### Run Application sepratly (Recommended for debug)
+### Executar a Aplicação Separadamente (Recomendado para Depuração)
 
-1. **Start MariaDB** (if not already running)
+1. **Iniciar MariaDB** (caso ainda não esteja a correr)
 
-2. **Start Backend** (Terminal 1)
-   ```bash
-   cd server/
-   source venv/bin/activate  # or venv\Scripts\activate on Windows
-   python appserver.py
-   ```
+2. **Iniciar Backend** (Terminal 1)
+```bash
+cd server/
+source venv/bin/activate  # ou venv\Scripts\activate no Windows
+python appserver.py
+```
 
-3. **Start Frontend** (Terminal 2)
-   ```bash
-   cd frontend/admin-one-vue-tailwind-master/
-   npm run dev
-   ```
+3. **Iniciar Frontend** (Terminal 2)
+```bash
+cd frontend/admin-one-vue-tailwind-master/
+npm run dev
+```
 
-4. **Set up Database** (Terminal 3)
-   ```bash
-   cd server/db/setup/
-   python clean_db.py
-   python create_db.py
-   python data_population.py
-   ```
+4. **Configurar Base de Dados** (Terminal 3)
+```bash
+cd server/db/setup/
+python clean_db.py
+python create_db.py
+python data_population.py
+```
 
-5. **Run Health Checks**
-   ```bash
-   cd server/
-   python tests/health_checks/test_flow_1.py
-   ```
+5. **Executar Verificações de Estado**
+```bash
+cd server/
+python tests/health_checks/test_flow_1.py
+```
 
-### Service URLs
+### URLs dos Serviços
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:5000
-- **Admin Portal**: http://localhost:5000/ap/login
+- **API Backend**: http://localhost:5000
+- **Portal de Administração**: http://localhost:5000/ap/login
 - **MariaDB**: localhost:3306
-  
-### Built With
 
-* python
+### Tecnologias Utilizadas
+* Python
 * Flask
 * Vue
-* Mariadb
-  
-## ⚠️ WARNING!
-This is a vulnerable application, don't use it for real life scenario and specially don't expose it to the internet, it may compromise your systems
+* MariaDB
+
+## ⚠️ AVISO!
+Esta é uma aplicação vulnerável. Não a utilize em cenários reais e, especialmente, não a exponha à Internet, pois poderá comprometer os seus sistemas.
