@@ -1,28 +1,102 @@
 from flask import Blueprint, request, jsonify, current_app
 from db.db_connector import DBConnector
-from Crypto.Cipher import DES
-from Crypto.Util.Padding import pad, unpad
+import bcrypt   # Para hashing de senhas
 import base64
+import os       # Para geração de IVs aleatórios
+from dotenv import load_dotenv   # Carrega variáveis de ambiente de um ficheiro .env
+from Crypto.Cipher import AES       # Para criptografia simétrica AES-GCM
 from .jwt_utils import issue_token, validate_token
+
+
+# ❌ REMOVIDOS: Módulos inseguros e obsoletos
+# from Crypto.Cipher import DES
+#from Crypto.Util.Padding import pad, unpad
+
 
 auth = Blueprint('auth', __name__)
 
-def encrypt_password(password: str, key: str) -> str:
-    des = DES.new(key.encode('utf-8'), DES.MODE_ECB)
-    padded_password = pad(password.encode('utf-8'), DES.block_size)
-    encrypted_password = des.encrypt(padded_password)
-    return base64.b64encode(encrypted_password).decode('utf-8')
+# Carrega as variáveis do ficheiro .env para o sistema
+load_dotenv()
 
-def decrypt_password(encrypted_password: str, key: str) -> str:
-    print(f'Encrypted password: {encrypted_password}')
-    des = DES.new(key.encode('utf-8'), DES.MODE_ECB)
-    decoded_encrypted_password = base64.b64decode(encrypted_password)
-    print(f'Decoded password: {decoded_encrypted_password}')
-    decrypted_password = unpad(des.decrypt(decoded_encrypted_password), DES.block_size)
-    print(f'Decrypted password: {decrypted_password}')
-    return decrypted_password.decode('utf-8')
 
-DES_KEY = "12345678"
+# ----------------------------------------------------
+# 1. GESTÃO DE SENHAS (Bcrypt - Hashing Irreversível)
+# ----------------------------------------------------
+
+# ❌ Funções DES originais (encrypt_password, decrypt_password) foram removidas.
+
+def hash_password(password: str) -> str:
+    """ Gera o hash da senha usando Bcrypt e retorna como string. """
+    password_bytes = password.encode('utf-8')
+    # Gera o salt e faz o hash em uma única chamada.
+    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+    return hashed.decode('utf-8') # Armazena como string (UTF-8) no DB
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    """ Verifica se a senha fornecida corresponde ao hash armazenado. """
+    if not isinstance(hashed_password, str):
+        return False
+        
+    password_bytes = password.encode('utf-8')
+    hashed_password_bytes = hashed_password.encode('utf-8')
+    try:
+        # checkpw lida com a extração do salt e a verificação
+        return bcrypt.checkpw(password_bytes, hashed_password_bytes)
+    except ValueError:
+        #Lidar com hash inválido ou incompatível (ex: senha antiga não migrada)
+        return False
+
+
+
+# ----------------------------------------------------
+# 2. CRIPTOGRAFIA SIMÉTRICA (AES-256 GCM)
+# ----------------------------------------------------
+# Substitui o DES-ECB. GCM fornece Confidencialidade e Autenticidade.
+
+# Agora o código lê da variável de ambiente, nunca expondo o valor real aqui
+AES_KEY = os.getenv('AES_SECRET_KEY').encode('utf-8')
+
+
+if len(AES_KEY) != 32:
+    raise ValueError("A AES_KEY deve ter exatamente 32 bytes para AES-256.") # verificar o tamanho da chave. 
+# Isso garante que o servidor nem sequer inicie se houver um erro de configuração no arquivo .env, 
+# evitando falhas críticas em tempo de execução. 
+
+
+def encrypt_data(data: str) -> str:
+    """ Mitigação Proposta 2: Substitui DES por AES-256-GCM (Criptografia Simétrica Segura) """
+    # Criado um cifrador AES no modo GCM
+    cipher = AES.new(AES_KEY, AES.MODE_GCM)
+    
+    # Encriptação e Tag de autenticação (Integridade) gerada
+    ciphertext, tag = cipher.encrypt_and_digest(data.encode('utf-8'))
+    
+    # Armazenamos: Nonce (IV) + Tag + Ciphertext (tudo em Base64)
+    # O Nonce é essencial para que a mesma mensagem gere resultados diferentes cada vez
+    package = cipher.nonce + tag + ciphertext
+    return base64.b64encode(package).decode('utf-8')
+
+def decrypt_data(encrypted_package: str) -> str:
+    """ Desencripta dados garantindo que não foram alterados (Verificação de Tag) """
+    try:
+        decoded = base64.b64decode(encrypted_package)
+        # O AES-GCM usa: Nonce (16 bytes), Tag (16 bytes), o resto é o Texto
+        nonce, tag, ciphertext = decoded[:16], decoded[16:32], decoded[32:]
+        
+        cipher = AES.new(AES_KEY, AES.MODE_GCM, nonce=nonce)
+        decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
+        return decrypted_data.decode('utf-8')
+    except (ValueError, KeyError) as e:
+        print(f"Erro na desencriptação ou falha de integridade: {e}")
+        return None
+
+
+# ❌ REMOVIDO: A chave DES fixa é insegura.
+# DES_KEY = "12345678"
+
+# ----------------------------------------------------
+# ENDPOINTS (COM HASHING)
+# ----------------------------------------------------
 
 @auth.route('/login', methods=['POST'])
 def login():
@@ -34,24 +108,30 @@ def login():
 
     _id = dbc.execute_query(query='get_user_by_name', args=username)
     if not isinstance(_id, int):
-        return jsonify({'status': 'Bad request'}), 400
+        return jsonify({'status': 'Bad credentials'}), 403
 
-    # Check if it is Temporary password
-    decrypted_password = ''
-    if password == 'T3MP-password-32':
-        decrypted_password = password
-    else:
-        encrypted_password = dbc.execute_query(query='get_user_password', args=_id)
-        decrypted_password = str(decrypt_password(encrypted_password, DES_KEY))
-        print(f'Password comparsion!! input: {password} vs decrypted_password: {decrypted_password}')
-    if password == decrypted_password:
+    # ✅ FLUXO DE HASHING: Busca o hash e verifica a senha
+    stored_hash = dbc.execute_query(query='get_user_password', args=_id)
+    
+    is_temp_password = (password == 'T3MP-password-32')
+    is_password_valid = False
+
+    if is_temp_password:
+        is_password_valid = True
+    elif isinstance(stored_hash, str):
+        is_password_valid = verify_password(password, stored_hash)
+
+    # ❌ A DESCRIPTOGRAFIA REVERSÍVEL (DES) FOI REMOVIDA
+    
+    if is_password_valid:
         dbc.execute_query(query='update_user_activity', args={
             'user_id': _id,
             'active': True
         })
         is_admin = dbc.execute_query(query='get_user_admin', args=_id)
         is_agent = dbc.execute_query(query='get_user_agent', args=_id)
-        print(f'Admin --> {is_admin}')
+        
+        # ... (lógica de definição de is_admin e is_agent) ...
         if is_admin == 1:
             is_admin = True
         else:
@@ -60,7 +140,7 @@ def login():
             is_agent = True
         else:
             is_agent = False
-
+            
         comp_id = dbc.execute_query(query='get_user_comp_id', args=_id)
         if not isinstance(comp_id, int):
             return jsonify({'status': 'Bad request'}), 400
@@ -96,12 +176,16 @@ def reset_password():
     is_valid, _payload = validate_token(token)
     if not is_valid:
         return jsonify({'status': 'Unauthorised'}), 403
-    if _payload['is_admin']:
-        user_id = _payload['user_id']
-    encrypted_password = encrypt_password(new_password, DES_KEY)
+    if _payload.get('is_admin'):
+        user_id = dict_data.get('user_id') or _payload['user_id'] 
+        # Permite que o admin resete a própria senha ou a de outro, se for passada
+    
+    # Usa hash_password em vez de encrypt_password (DES)
+    # encrypted_password = encrypt_password(new_password, DES_KEY)
+    hashed_password = hash_password(new_password)
     result = dbc.execute_query(query='update_user_password', args={
         "user_id": user_id,
-        "new_password": encrypted_password
+        "new_password": hashed_password # Armazena o hash
     })
     if result is True:
         return jsonify({'status': 'Ok'}), 200
@@ -115,11 +199,12 @@ def signup():
     dict_data = request.get_json()
     user_id = 0
     
-    encrypted_password = encrypt_password(dict_data['password'], DES_KEY)
+    # ✅ HASH DA SENHA
+    hashed_password = hash_password(dict_data['password'])
 
     result = dbc.execute_query('create_user_admin', args={
         "username": dict_data['username'],
-        "password": encrypted_password,
+        "password": hashed_password, # Armazena o HASH
         "email": dict_data['email'],
         "comp_name": dict_data['comp_name'],
         "num_employees": dict_data['num_employees'],
