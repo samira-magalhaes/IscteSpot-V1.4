@@ -1,12 +1,26 @@
 import mariadb
-class DBConnector:
+from dotenv import load_dotenv
+import os # Necessário para ler variáveis de ambiente
+import re  # Para validação de e-mail com Regex
 
+
+load_dotenv() # Isto lê o ficheiro .env e carrega TUDO para o os.environ
+
+
+class DBConnector:
+  
     def __init__(self):
-        self.host = 'localhost'
-        self.user = 'root'
-        self.password = 'teste123'
-        self.database = 'iscte_spot'
-        self.port = 3306
+        # ✅ CORREÇÃO: Credenciais carregadas de variáveis de ambiente
+        # Isso impede que a senha vaze se o código-fonte for exposto.
+        # Use o .get() para fornecer um valor padrão seguro (ou uma exceção).
+        self.host = os.environ.get('DB_HOST', 'localhost')
+        self.user = os.environ.get('DB_USER', 'db_connector') # ⚠️ Evitar 'root' em produção
+        self.password = os.environ.get('DB_PASSWORD') # Deixa ser None se não for definido, forçando o erro de conexão
+        self.database = os.environ.get('DB_DATABASE', 'iscte_spot')
+        self.port = int(os.environ.get('DB_PORT', 3306))
+
+    # O método connect() permanece o mesmo, mas agora usa variáveis seguras.
+    # ...    
 
     def connect(self):
         ''' Connect to database mariadb'''
@@ -22,8 +36,75 @@ class DBConnector:
         except mariadb.Error as e:
             print(f"Error connecting to MariaDB Platform: {e}")
             return None
+        
+
+    def validate_inputs(self, query, args):
+        """
+        Valida e sanitiza os dados antes de processar a query.
+        Retorna (True, args_limpos) ou (False, None)
+        """
+        try:
+            # 1. Validação de IDs (Devem ser sempre Inteiros)
+            # Lista de queries que esperam um ID numérico como argumento único
+            queries_com_id = [
+                'get_user_password', 'get_user_by_id', 'get_clients_list', 
+                'get_employees_list', 'get_compnay_id_by_user', 'get_user_sales',
+                'get_user_admin', 'get_user_comp_id', 'get_products_list',
+                'get_company_revenue', 'get_last_3_sales', 'get_admin_tickets',
+                'get_user_tickets', 'get_user_agent', 'get_ticket_by_id',
+                'delete_user_by_id', 'delete_company_by_id', 'delete_client_by_id'
+                'update_company_revenue', 'delete_sales_by_comp_id'            
+            ]
+
+            if query in queries_com_id:
+                # Se for uma query de ID, tentamos converter para inteiro (Sanitização de tipo). 
+                # Se houver texto malicioso, o int(args) vai falhar e cair no except.
+                return True, int(args)
+
+            # 2. Validação de Dicionários (Para inserts/updates)
+            if isinstance(args, dict):
+                # Exemplo: Validar e-mail se existir no dicionário
+                if 'email' in args:
+                    email_pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+                    if not re.match(email_pattern, args['email']):
+                        print(f"Erro: E-mail inválido - {args['email']}")
+                        return False, None
+                
+                # Exemplo: Validar se campos numéricos são realmente números
+                for field in ['comp_id', 'user_id', 'quantity', 'month', 'ticket_id', 'client_id', 'product_id']:
+                    if field in args:
+                        args[field] = int(args[field])
+                
+                # Exemplo: Sanitização de strings (Remover caracteres de comando SQL)
+                for key, value in args.items():
+                    if isinstance(value, str):
+                        # Remove terminadores (caracteres) de comando SQL por precaução (Sanitização básica)
+                        args[key] = value.replace(";", "").replace("--", "")
+
+            return True, args
+
+        except (ValueError, TypeError) as e:
+            print(f"Erro de Validação: Dados incompatíveis para a query {query}. {e}")
+            return False, None
 
     def execute_query(self, query, args=None):
+        # --- NOVO: CAMADA DE VALIDAÇÃO ---
+        is_valid, sanitized_args = self.validate_inputs(query, args)
+        if not is_valid:
+            print(f"ALERTA: Tentativa de query com dados inválidos: {query} | Args: {args}")
+            return False
+        
+        args = sanitized_args # A partir daqui, os dados estão "limpos"
+        # ---------------------------------
+
+        print(f'DB query selected: {query}, args: {args}')
+        connection = self.connect()
+        if connection is None: return None
+
+        cursor = connection.cursor(dictionary=True)
+        # ... (segue o seu código com os blocos elif)    
+
+    
         ''' Execute queries by query name
             query:
                 READ
@@ -100,18 +181,19 @@ class DBConnector:
                         return result['PasswordHash']
                 except TypeError:
                     return False
-
+            # SEGURO: Usando placeholder (?) e tupla (args,)
             elif query == 'get_user_by_id':
-                cursor.execute(f"SELECT * FROM Users WHERE UserID = {args}")
+                cursor.execute(f"SELECT * FROM Users WHERE UserID = ?", (args,)) # Parâmetro (args,) passado separadamente
                 result = cursor.fetchone()
 
+            # SEGURO: Usando placeholder (?) e tupla (args,)
             elif query == 'get_clients_list':
-                cursor.execute(
-                    f"""
-                    SELECT ClientID, FirstName, LastName, Email, PhoneNumber, Address, City, Country
-                    FROM Clients
-                    WHERE CompanyID = {args}
-                    """)
+                sql_query = """
+                SELECT ClientID, FirstName, LastName, Email, PhoneNumber, Address, City, Country
+                FROM Clients
+                WHERE CompanyID = ?
+                """
+                cursor.execute(sql_query, (args,)) # Parâmetro (args,) passado separadamente
                 result = cursor.fetchall()
                 if isinstance(result, list):
                     return result
@@ -119,7 +201,7 @@ class DBConnector:
                     return False
 
             elif query == 'get_employees_list':
-                cursor.execute(f"SELECT UserID, Username, Email, CommissionPercentage, isActive FROM Users WHERE CompanyID = {args}")
+                cursor.execute(f"SELECT UserID, Username, Email, CommissionPercentage, isActive FROM Users WHERE CompanyID = ?", (args,))
                 result = cursor.fetchall()
                 if isinstance(result, list):
                     return result
@@ -127,7 +209,7 @@ class DBConnector:
                     return False
 
             elif query == 'get_compnay_id_by_user':
-                cursor.execute(f'SELECT CompanyID FROM Users WHERE UserID = {args}')
+                cursor.execute(f"SELECT CompanyID FROM Users WHERE UserID = ?", (args,))
                 result = cursor.fetchone()
                 print(result)
                 if isinstance(result, tuple):
@@ -153,8 +235,8 @@ class DBConnector:
                     return False
 
             elif query == 'get_user_sales':
-                cursor.execute(
-                    f"""
+                # 1. Remova o 'f' antes das aspas e troque {args} por ?
+                query_sql = """
                     SELECT 
                         S.SaleID,
                         U.UserName,    
@@ -166,15 +248,19 @@ class DBConnector:
                     FROM 
                         Sales S
                     JOIN 
-                        Users U ON S.UserID = U.UserID       -- Join the Users table to get UserName
+                        Users U ON S.UserID = U.UserID 
                     JOIN 
-                        Clients C ON S.ClientID = C.ClientID -- Join the Clients table to get ClientName
+                        Clients C ON S.ClientID = C.ClientID 
                     JOIN 
-                        Products P ON S.ProductID = P.ProductID -- Join the Products table to get ProductName
+                        Products P ON S.ProductID = P.ProductID 
                     WHERE 
-                        S.UserID = {args};
-                    """
-                )
+                        S.UserID = ?;
+                """
+    
+                # 2. Passe a tupla (args,) como segundo argumento. 
+                # A vírgula é obrigatória para o Python entender que é uma tupla de um único valor.
+                cursor.execute(query_sql, (args,))
+                
                 result = cursor.fetchall()
                 print(result)
                 if isinstance(result, list):
@@ -217,32 +303,34 @@ class DBConnector:
                     return False
 
             elif query == 'get_company_revenue':
-                cursor.execute(f"SELECT Revenue FROM Companies WHERE CompanyID = {args}")
+                cursor.execute(f"SELECT Revenue FROM Companies WHERE CompanyID = ?", (args,))
                 result = cursor.fetchone()
                 if isinstance(result, tuple):
                     return result[0]
                 return result['Revenue']
-
+            
             elif query == 'get_employees_return':
-                cursor.execute(
-                    f"""
-                            SELECT 
-                                u.UserID,
-                                u.Username,
-                                u.CommissionPercentage,
-                                COUNT(s.SaleID) AS total_sales,
-                                SUM(s.Quantity * p.SellingPrice) AS total_sales_amount,
-                                (SUM(s.Quantity * p.SellingPrice) * (u.CommissionPercentage / 100)) AS total_commission
-                            FROM Users u
-                            LEFT JOIN Sales s ON u.UserID = s.UserID
-                            LEFT JOIN Products p ON s.ProductID = p.ProductID
-                            WHERE u.CompanyID = {args['comp_id']} 
-                            AND p.CompanyID = u.CompanyID
-                            AND MONTH(s.SaleDate) = {args['month']}
-                            AND YEAR(s.SaleDate) = 2024
-                            GROUP BY u.UserID, u.CommissionPercentage
-                    """
-                )
+                
+                # 1. Removido o 'f' do início. Agora é uma string pura.
+                sql = """
+                    SELECT 
+                        u.UserID, u.Username, u.CommissionPercentage,
+                        COUNT(s.SaleID) AS total_sales,
+                        SUM(s.Quantity * p.SellingPrice) AS total_sales_amount,
+                        (SUM(s.Quantity * p.SellingPrice) * (u.CommissionPercentage / 100)) AS total_commission
+                     FROM Users u
+                    LEFT JOIN Sales s ON u.UserID = s.UserID
+                    LEFT JOIN Products p ON s.ProductID = p.ProductID
+                    WHERE u.CompanyID = ? 
+                    AND p.CompanyID = u.CompanyID
+                    AND MONTH(s.SaleDate) = ?
+                    AND YEAR(s.SaleDate) = 2024
+                    GROUP BY u.UserID, u.CommissionPercentage
+                """
+    
+                # 2. Passado os valores do dicionário em uma tupla na ordem dos '?'
+                # O conector enviará o comando e os dados separadamente ao banco
+                cursor.execute(sql, (args['comp_id'], args['month']))
                 result = cursor.fetchall()
                 # Format the result into a list of dictionaries
                 employee_sales_data = []
@@ -319,22 +407,24 @@ class DBConnector:
                 else:
                     return False
 
+            # SEGURO: Usando múltiplos placeholders (?)
             elif query == 'get_costs_sales_month':
-                cursor.execute(
-                    f"""
-                    SELECT 
-                        SUM(Products.SellingPrice * Sales.Quantity) AS TotalSellingPrice,
-                        SUM(Products.FactoryPrice * Sales.Quantity) AS TotalFactoryPrice
-                    FROM 
-                        Sales
-                    JOIN 
-                        Products ON Sales.ProductID = Products.ProductID
-                    WHERE 
-                        Products.CompanyID = {args['comp_id']}
-                        AND MONTH(Sales.SaleDate) = {args['month']}
-                        AND YEAR(Sales.SaleDate) = 2024;
-                    """
-                )
+                sql_query = """
+                SELECT 
+                    SUM(Products.SellingPrice * Sales.Quantity) AS TotalSellingPrice,
+                    SUM(Products.FactoryPrice * Sales.Quantity) AS TotalFactoryPrice
+                FROM 
+                    Sales
+                JOIN 
+                    Products ON Sales.ProductID = Products.ProductID
+                WHERE 
+                    Products.CompanyID = ? # ✅ Placeholder para args['comp_id']
+                    AND MONTH(Sales.SaleDate) = ? # ✅ Placeholder para args['month']
+                    AND YEAR(Sales.SaleDate) = 2024;
+                """
+                # Tupla de argumentos na ordem exata dos placeholders
+                query_args = (args['comp_id'], args['month'])
+                cursor.execute(sql_query, query_args)
                 result = cursor.fetchone()
                 print(result)
                 try:
@@ -346,8 +436,8 @@ class DBConnector:
                     return False
 
             elif query == 'get_admin_tickets':
-                cursor.execute(
-                    f"""
+                # 1. Remova o 'f' (f-string) e substitua {args} por ?
+                sql = """
                     SELECT 
                         st.TicketID,
                         st.UserID,
@@ -363,9 +453,12 @@ class DBConnector:
                     JOIN 
                         Users u ON st.UserID = u.UserID
                     WHERE 
-                        u.CompanyID = {args};
-                    """
-                )
+                        u.CompanyID = ?;
+                """
+    
+                # 2. Passe 'args' dentro de uma tupla (args,) no execute
+                cursor.execute(sql, (args,))
+
                 result = cursor.fetchall()
                 if isinstance(result, list):
                     return result
@@ -552,11 +645,17 @@ class DBConnector:
                 else:
                     return False
 
+            # SEGURO: Usando placeholders e lógica mais limpa
             elif query == 'update_user_activity':
+                user_id = args['user_id']
                 if args['active']:
-                    cursor.execute(f"UPDATE Users SET LastLogin = CURRENT_TIMESTAMP, isActive = True WHERE UserID = {args['user_id']}")
+                    # Se for True, atualiza LastLogin e isActive
+                    sql_query = "UPDATE Users SET LastLogin = CURRENT_TIMESTAMP, isActive = True WHERE UserID = ?"
+                    cursor.execute(sql_query, (user_id,))
                 else:
-                    cursor.execute(f"UPDATE Users SET LastLogout = CURRENT_TIMESTAMP, isActive = False WHERE UserID = {args['user_id']}")
+                    # Se for False, atualiza LastLogout e isActive
+                    sql_query = "UPDATE Users SET LastLogout = CURRENT_TIMESTAMP, isActive = False WHERE UserID = ?"
+                    cursor.execute(sql_query, (user_id,))
                 connection.commit()
                 result = cursor.rowcount
                 if isinstance(result, tuple):
@@ -658,17 +757,13 @@ class DBConnector:
                 connection.commit()
                 result = cursor.rowcount
                 return True
-
+            
             elif query == 'update_seller_commission':
-                value = args['new_commission']
-                user_id = args['seller_id']
-                cursor.execute(
-                    f"""
-                    UPDATE Users
-                    SET CommissionPercentage = {value}
-                    WHERE UserID = {user_id};
-                    """
-                )
+                # 1. String pura sem 'f', usando '?' como placeholders
+                sql = "UPDATE Users SET CommissionPercentage = ? WHERE UserID = ?"
+
+                # 2. Valores passados separadamente como uma tupla
+                cursor.execute(sql, (args['new_commission'], args['seller_id']))                
                 connection.commit()
                 result = cursor.rowcount
                 print(result)
@@ -725,9 +820,9 @@ class DBConnector:
                     return True
                 else:
                     return False
-
+            # SEGURO: Usando placeholder (?) e tupla (args,)
             elif query == 'delete_client_by_id':
-                cursor.execute(f"DELETE FROM Clients WHERE ClientID = {args}")
+                cursor.execute(f"DELETE FROM Clients WHERE ClientID = ?", (args,)) # Parâmetro (args,) passado separadamente
                 connection.commit()
                 result = cursor.rowcount
                 if isinstance(result, tuple):
