@@ -42,11 +42,20 @@ docker-compose up --build
 * Execute o script de configuração (**setup.ps1** para Windows, **setup.sh** para macOS e Linux) para popular a base de dados com dados de teste.
 ```
 .\setup.ps1
+
+ou
+
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 * Nesta fase a aplicação deverá estar pronta. Pode executar verificações de estado para confirmar se está tudo correto.  
   Abra o navegador e aceda a **http://localhost:5173** para ver a interface da aplicação.
 ```
 docker exec project-server-1 python /app/tests/health_checks/test_flow_1.py
+
+ou
+
+docker exec isctespot-main-server-1 python /app/tests/health_checks/test_flow_1.py
+
 ```
 
 ## Configuração Local (Instalação Manual)
