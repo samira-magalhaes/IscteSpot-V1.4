@@ -13,11 +13,11 @@ class DBConnector:
         # ✅ CORREÇÃO: Credenciais carregadas de variáveis de ambiente
         # Isso impede que a senha vaze se o código-fonte for exposto.
         # Use o .get() para fornecer um valor padrão seguro (ou uma exceção).
-        self.host = os.environ.get('DB_HOST', 'localhost')
+        self.host = os.environ.get('DB_HOST', 'mariadb')
         self.user = os.environ.get('DB_USER', 'db_connector') # ⚠️ Evitar 'root' em produção
         self.password = os.environ.get('DB_PASSWORD') # Deixa ser None se não for definido, forçando o erro de conexão
         self.database = os.environ.get('DB_DATABASE', 'iscte_spot')
-        self.port = int(os.environ.get('DB_PORT', 3307))
+        self.port = int(os.environ.get('DB_PORT', 3306))
 
     # O método connect() permanece o mesmo, mas agora usa variáveis seguras.
     # ...    

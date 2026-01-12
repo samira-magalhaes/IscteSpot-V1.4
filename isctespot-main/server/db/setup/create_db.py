@@ -8,10 +8,10 @@ load_dotenv()
 # Conexão com o MariaDB usando variáveis de ambiente
 try:
     connection = mariadb.connect(
-        host=os.environ.get("DB_HOST", "localhost"),
+        host=os.environ.get("DB_HOST", "mariadb"),
         user=os.environ.get("DB_USER", "db_connector"),
         password=os.environ.get("DB_PASSWORD", ""),
-        port=int(os.environ.get("DB_PORT", 3307))
+        port=int(os.environ.get("DB_PORT", 3306))
     )
     cursor = connection.cursor()
 
