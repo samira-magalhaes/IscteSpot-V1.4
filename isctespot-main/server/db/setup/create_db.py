@@ -1,14 +1,19 @@
 import mariadb
+import os
+from dotenv import load_dotenv
 
-connection = mariadb.connect(
-    host="localhost",
-    user="root",
-    password="teste123",
-    port=3306
-)
+# Carrega variáveis do .env
+load_dotenv()
 
-cursor = connection.cursor()
+# Conexão com o MariaDB usando variáveis de ambiente
 try:
+    connection = mariadb.connect(
+        host=os.environ.get("DB_HOST", "localhost"),
+        user=os.environ.get("DB_USER", "db_connector"),
+        password=os.environ.get("DB_PASSWORD", ""),
+        port=int(os.environ.get("DB_PORT", 3307))
+    )
+    cursor = connection.cursor()
 
     # Create the database if it doesn't exist
     cursor.execute("CREATE DATABASE IF NOT EXISTS iscte_spot;")
@@ -37,10 +42,7 @@ try:
         UNIQUE INDEX Username (Username) USING BTREE,
         UNIQUE INDEX Email (Email) USING BTREE,
         INDEX CompanyID (CompanyID) USING BTREE
-    )
-    COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ) COLLATE='latin1_swedish_ci' ENGINE=InnoDB AUTO_INCREMENT=1;
 
     CREATE TABLE IF NOT EXISTS Companies (
         CompanyID INT(11) NOT NULL AUTO_INCREMENT,
@@ -52,10 +54,7 @@ try:
         PRIMARY KEY (CompanyID) USING BTREE,
         INDEX AdminUserID (AdminUserID) USING BTREE,
         CONSTRAINT companies_ibfk_1 FOREIGN KEY (AdminUserID) REFERENCES Users (UserID) ON UPDATE RESTRICT ON DELETE RESTRICT
-    )
-    COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ) COLLATE='latin1_swedish_ci' ENGINE=InnoDB AUTO_INCREMENT=1;
 
     CREATE TABLE IF NOT EXISTS Clients (
         ClientID INT(11) NOT NULL AUTO_INCREMENT,
@@ -70,27 +69,21 @@ try:
         CompanyID INT(11) NULL DEFAULT NULL,
         PRIMARY KEY (ClientID) USING BTREE,
         UNIQUE INDEX Email (Email) USING BTREE
-    )
-    COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ) COLLATE='latin1_swedish_ci' ENGINE=InnoDB AUTO_INCREMENT=1;
 
     CREATE TABLE IF NOT EXISTS Products (
         ProductID INT(11) NOT NULL AUTO_INCREMENT,
         CompanyID INT(11) NOT NULL,
         ProductName VARCHAR(255) NOT NULL COLLATE 'latin1_swedish_ci',
-        Category VARCHAR(100) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',  -- New field for product category
+        Category VARCHAR(100) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
         FactoryPrice DECIMAL(10,2) NOT NULL,
         SellingPrice DECIMAL(10,2) NOT NULL,
         CreatedAt TIMESTAMP NULL DEFAULT current_timestamp(),
         PRIMARY KEY (ProductID) USING BTREE,
         INDEX CompanyID (CompanyID) USING BTREE,
         CONSTRAINT products_ibfk_1 FOREIGN KEY (CompanyID) REFERENCES Companies (CompanyID) ON UPDATE RESTRICT ON DELETE RESTRICT
-    )
-    COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
-    
+    ) COLLATE='latin1_swedish_ci' ENGINE=InnoDB AUTO_INCREMENT=1;
+
     CREATE TABLE IF NOT EXISTS Sales (
         SaleID INT(11) NOT NULL AUTO_INCREMENT,
         UserID INT(11) NULL,
@@ -105,14 +98,11 @@ try:
         CONSTRAINT sales_ibfk_1 FOREIGN KEY (UserID) REFERENCES Users (UserID) ON UPDATE RESTRICT ON DELETE SET NULL,
         CONSTRAINT sales_ibfk_2 FOREIGN KEY (ClientID) REFERENCES Clients (ClientID) ON UPDATE RESTRICT ON DELETE SET NULL,
         CONSTRAINT sales_ibfk_3 FOREIGN KEY (ProductID) REFERENCES Products (ProductID) ON UPDATE RESTRICT ON DELETE SET NULL
-    )
-    COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
-    
+    ) COLLATE='latin1_swedish_ci' ENGINE=InnoDB AUTO_INCREMENT=1;
+
     CREATE TABLE IF NOT EXISTS SupportTickets (
         TicketID INT(11) NOT NULL AUTO_INCREMENT,
-        UserID INT(11) NULL,  -- Allow NULLs for ON DELETE SET NULL
+        UserID INT(11) NULL,
         Status VARCHAR(50) NOT NULL COLLATE 'latin1_swedish_ci',
         Category VARCHAR(100) NOT NULL COLLATE 'latin1_swedish_ci',
         Description LONGTEXT NOT NULL COLLATE 'latin1_swedish_ci',
@@ -126,10 +116,7 @@ try:
             REFERENCES Users (UserID) 
             ON UPDATE RESTRICT 
             ON DELETE SET NULL
-    )
-    COLLATE='latin1_swedish_ci'
-    ENGINE=InnoDB
-    AUTO_INCREMENT=1;
+    ) COLLATE='latin1_swedish_ci' ENGINE=InnoDB AUTO_INCREMENT=1;
     """
 
     # Executing the SQL statements
@@ -142,7 +129,8 @@ try:
 
 except mariadb.Error as err:
     print(f"Error: {err}")
+
 finally:
-    if connection is not None:
+    if 'connection' in locals() and connection:
         cursor.close()
         connection.close()
