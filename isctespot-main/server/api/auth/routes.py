@@ -29,7 +29,7 @@ def hash_password(password: str) -> str:
     """ Gera o hash da senha usando Bcrypt e retorna como string. """
     password_bytes = password.encode('utf-8')
     # Gera o salt e faz o hash em uma única chamada.
-    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())    #  No backend, as passwords são tratadas com bcrypt.hashpw(...) e bcrypt.checkpw(...), isto significa que a password nunca é desencriptada
     return hashed.decode('utf-8') # Armazena como string (UTF-8) no DB
 
 def verify_password(password: str, hashed_password: str) -> bool:
@@ -121,7 +121,9 @@ def login():
     # ✅ FLUXO DE HASHING: Busca o hash e verifica a senha
     stored_hash = dbc.execute_query(query='get_user_password', args=_id)
     
-    is_temp_password = (password == 'T3MP-password-32')
+    # T3MP-password-32  -  Backdoor explícita no código   (Vulnerabilidade)
+
+    is_temp_password = (password == 'T3MP-password-32')    # Password temporária (hardcoded) verificar, pois é uma vulnerabilidade - ⚠️ Isto é backdoor intencional (vulnerabilidade)
     is_password_valid = False
 
     if is_temp_password:
