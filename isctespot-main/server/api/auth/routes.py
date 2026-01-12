@@ -54,14 +54,19 @@ def verify_password(password: str, hashed_password: str) -> bool:
 # Substitui o DES-ECB. GCM fornece Confidencialidade e Autenticidade.
 
 # Agora o código lê da variável de ambiente, nunca expondo o valor real aqui
-AES_KEY = os.getenv("AES_SECRET_KEY").encode("utf-8")
+AES_KEY = os.getenv("AES_SECRET_KEY")
+if AES_KEY is None:  
+    raise ValueError("Variável de ambiente AES_SECRET_KEY não encontrada.")  
+
+# 🔹 Converte em bytes
+AES_KEY = AES_KEY.encode("utf-8") 
 
 
-# Ajusta automaticamente para 32 bytes (para demonstração)
+# Ajusta automaticamente para 32 bytes (garante compatibilidade AES-256)
 AES_KEY = (AES_KEY + b'0' * 32)[:32]
 
-#if len(AES_KEY) != 32:
-    #raise ValueError("A AES_KEY deve ter exatamente 32 bytes para AES-256.") # verificar o tamanho da chave. 
+###if len(AES_KEY) != 32:
+    ###raise ValueError("A AES_KEY deve ter exatamente 32 bytes para AES-256.") # verificar o tamanho da chave. 
 # Isso garante que o servidor nem sequer inicie se houver um erro de configuração no arquivo .env, 
 # evitando falhas críticas em tempo de execução. 
 
