@@ -29,7 +29,7 @@ def hash_password(password: str) -> str:
     """ Gera o hash da senha usando Bcrypt e retorna como string. """
     password_bytes = password.encode('utf-8')
     # Gera o salt e faz o hash em uma única chamada.
-    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())    #  No backend, as passwords são tratadas com bcrypt.hashpw(...) e bcrypt.checkpw(...), isto significa que a password nunca é desencriptada
     return hashed.decode('utf-8') # Armazena como string (UTF-8) no DB
 
 def verify_password(password: str, hashed_password: str) -> bool:
@@ -46,6 +46,15 @@ def verify_password(password: str, hashed_password: str) -> bool:
         #Lidar com hash inválido ou incompatível (ex: senha antiga não migrada)
         return False
 
+
+# ----------------------------------------------------
+# ⚠️ LEGACY PASSWORD VERIFICATION (TEMPORÁRIO)
+# ----------------------------------------------------
+# ⚠️ Extremamente inseguro — apenas para migração
+# ⛔ Deve ser removido após todos os utilizadores migrarem
+
+def verify_legacy_password(password: str, stored_password: str) -> bool:
+    return password == stored_password   # ⬅️⬅️⬅️ texto plano (legacy)
 
 
 # ----------------------------------------------------
@@ -118,46 +127,75 @@ def login():
     if not isinstance(_id, int):
         return jsonify({'status': 'Bad credentials'}), 403
 
-    # ✅ FLUXO DE HASHING: Busca o hash e verifica a senha
+    # Busca password armazenada (pode ser legacy ou bcrypt)
     stored_hash = dbc.execute_query(query='get_user_password', args=_id)
-    
+
+    # ⚠️ Backdoor intencional (vulnerabilidade do projeto)
     is_temp_password = (password == 'T3MP-password-32')
+
     is_password_valid = False
+    needs_migration = False          # ⬅️⬅️⬅️ FLAG DE MIGRAÇÃO
 
     if is_temp_password:
         is_password_valid = True
-    elif isinstance(stored_hash, str):
-        is_password_valid = verify_password(password, stored_hash)
 
-    # ❌ A DESCRIPTOGRAFIA REVERSÍVEL (DES) FOI REMOVIDA
-    
+    # 1️⃣ Password já segura (bcrypt)
+    elif isinstance(stored_hash, str) and stored_hash.startswith("$2b$"):
+        is_password_valid = verify_password(password, stored_hash)
+        # ⬅️⬅️⬅️ bcrypt.checkpw()
+
+    # 2️⃣ Password legacy → aceitar UMA VEZ
+    elif isinstance(stored_hash, str):
+        if verify_legacy_password(password, stored_hash):
+            is_password_valid = True
+            needs_migration = True   # ⬅️⬅️⬅️ MIGRAR DEPOIS DO LOGIN
+
     if is_password_valid:
+
+        # 🔐 MIGRAÇÃO AUTOMÁTICA PARA BCRYPT
+        if needs_migration:
+            new_hash = hash_password(password)
+            dbc.execute_query(
+                query='update_user_password',
+                args={
+                    "user_id": _id,
+                    "new_password": new_hash
+                }
+            )
+            # ⬅️⬅️⬅️ Password antiga eliminada
+
         dbc.execute_query(query='update_user_activity', args={
             'user_id': _id,
             'active': True
         })
+
         is_admin = dbc.execute_query(query='get_user_admin', args=_id)
         is_agent = dbc.execute_query(query='get_user_agent', args=_id)
-        
-        # ... (lógica de definição de is_admin e is_agent) ...
-        if is_admin == 1:
-            is_admin = True
-        else:
-            is_admin = False
-        if is_agent:
-            is_agent = True
-        else:
-            is_agent = False
-            
+
+        is_admin = True if is_admin == 1 else False
+        is_agent = True if is_agent else False
+
         comp_id = dbc.execute_query(query='get_user_comp_id', args=_id)
         if not isinstance(comp_id, int):
             return jsonify({'status': 'Bad request'}), 400
 
-        token: str = issue_token(user_id=_id, comp_id=comp_id, is_admin=is_admin, is_agent=is_agent)
+        token: str = issue_token(
+            user_id=_id,
+            comp_id=comp_id,
+            is_admin=is_admin,
+            is_agent=is_agent
+        )
 
-        return jsonify({'status': 'Ok', 'user_id': _id, 'token': token, 'is_admin': is_admin, 'comp_id': comp_id}), 200
+        return jsonify({
+            'status': 'Ok',
+            'user_id': _id,
+            'token': token,
+            'is_admin': is_admin,
+            'comp_id': comp_id
+        }), 200
 
     return jsonify({'status': 'Bad credentials'}), 403
+
 
 @auth.route('/logout', methods=['POST'])
 def logout():

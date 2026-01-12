@@ -17,10 +17,10 @@ load_dotenv()
 try:
     # Conexão com o banco de dados
     db = mariadb.connect(
-        host=os.environ.get("DB_HOST", "localhost"),
+        host=os.environ.get("DB_HOST", "mariadb"),
         user=os.environ.get("DB_USER", "db_connector"),
         password=os.environ.get("DB_PASSWORD", ""),
-        port=int(os.environ.get("DB_PORT", 3307)),
+        port=int(os.environ.get("DB_PORT", 3306)),
         database=os.environ.get("DB_DATABASE", "iscte_spot")
     )
     cursor = db.cursor()
