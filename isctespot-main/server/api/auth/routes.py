@@ -54,7 +54,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 # Substitui o DES-ECB. GCM fornece Confidencialidade e Autenticidade.
 
 # Agora o código lê da variável de ambiente, nunca expondo o valor real aqui
-AES_KEY = os.getenv('AES_SECRET_KEY').encode('utf-8')
+AES_KEY = os.getenv("AES_SECRET_KEY").encode("utf-8")
 
 
 if len(AES_KEY) != 32:

@@ -14,6 +14,8 @@ services:
     build: ./server
     ports:
       - "5000:5000"
+    env_file:                     # <-- adicionado env_file
+      - ./server/.env             # <-- caminho para o .env
     environment:
       - FLASK_ENV=development
     depends_on:
@@ -28,7 +30,7 @@ services:
       MYSQL_ROOT_PASSWORD: teste123
       MYSQL_DATABASE: iscte_spot
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - ./data:/var/lib/mysql
     networks:
