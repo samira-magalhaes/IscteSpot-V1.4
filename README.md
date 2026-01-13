@@ -118,7 +118,15 @@ python create_db.py
 Popular com dados fake:
 python data_population.py
 
-CONYINUA.....
+Ainda dentro do container - Para confirmar usuários:
+python3
+
+
+usar os scripts de setup ou testar a conexão:
+
+
+
+
 
 ```
 
