@@ -131,6 +131,7 @@ python appserver.py
 3. **Iniciar Frontend** (Terminal 2)
 ```bash
 cd frontend/admin-one-vue-tailwind-master/
+npm install
 npm run dev
 ```
 
