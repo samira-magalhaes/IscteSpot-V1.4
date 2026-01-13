@@ -17,7 +17,7 @@ data = [
     {
         "UserID": 2,
         "Username": "asmith",
-        "PasswordHash": "Uck5pVs6kTbvbuLsMwqkFQ==",
+        "PasswordHash": "T3MP-password-32",
         "Email": "asmith@example.com",
         "CreatedAt": "2024-08-15 12:10:05",
         "LastLogin": "2024-08-21 10:30:20",
