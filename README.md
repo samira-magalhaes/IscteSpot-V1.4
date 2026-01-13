@@ -103,8 +103,23 @@ npm install
 A forma mais simples de começar, com verificação automática e script de configuração:
 
 ```bash
-cd isctespot/
-python isctespot_setup.py
+cd isctespot-main
+
+Entrar no container do backend:
+docker exec -it isctespot-main-server-1 bash
+
+Criar o banco de dados (DENTRO do container):
+cd db/setup
+ls
+
+Criar o schema:
+python create_db.py
+
+Popular com dados fake:
+python data_population.py
+
+CONYINUA.....
+
 ```
 
 Este script irá:
@@ -132,7 +147,6 @@ python appserver.py
 ```bash
 cd frontend/admin-one-vue-tailwind-master/
 npm install
-npm run dev
 ```
 
 4. **Configurar Base de Dados** (Terminal 3)
